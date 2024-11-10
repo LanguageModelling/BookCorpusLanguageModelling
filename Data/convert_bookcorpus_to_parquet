@@ -1,0 +1,13 @@
+from datasets import load_dataset
+import pandas as pd
+
+# Load BookCorpus dataset using the custom script or Hugging Face Hub
+dataset = load_dataset("bookcorpus.py", split="train")
+
+# Convert to Parquet
+dataset.to_parquet("bookcorpus.parquet")
+
+# Optional: Load and inspect the Parquet file
+df = pd.read_parquet("bookcorpus.parquet")
+print(df.head())
+
