@@ -68,7 +68,7 @@ def preprocess(text_input):
     preprocessed_text = preprocessed_text.strip()
 
     # 1. Add start and end tokens 
-    preprocessed_text = "[START] " + preprocessed_text + " [END]"
+    preprocessed_text = "[" + preprocessed_text + "]"
 
     return preprocessed_text
 
