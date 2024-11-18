@@ -7,13 +7,24 @@ import torch
 import torch.nn.functional as F
 from tiktoken import get_encoding
 import time
+import os
 
 
 class Library:
-    def __init__(self, encoding = 1000, train_size = 2**20, test_size = 2**12):
+    def __init__(self, encoding = 1000, train_size = 2**20, test_size = 2**12, streaming=True):
+        self.streaming=streaming
         self.train_size = train_size
         self.test_size = test_size
-        self.dataset = datasets.load_dataset('bookcorpus', streaming=True, trust_remote_code=True)['train']
+        if streaming:
+            self.dataset = datasets.load_dataset('bookcorpus', streaming=streaming, trust_remote_code=True, split=f'train[:{self.test_size+self.train_size}]')
+        else:
+            path = f'Data/Datasets/{train_size+test_size}.pt'
+            if os.path.isfile(path):
+                self.dataset = torch.load(path)
+            else:
+                self.dataset = datasets.load_dataset('bookcorpus', streaming=streaming, trust_remote_code=True, split=f'train[:{self.test_size+self.train_size}]')
+                torch.save(self.dataset, path)
+
         match encoding:
             case '200k':
                 self.encoding = get_encoding('o200k_base')
@@ -38,7 +49,7 @@ class Library:
     
     def _create_train_generator(self):
         for idx, data in enumerate(self.dataset):
-            if self.train_size > idx >= self.test_size:
+            if self.train_size+self.test_size > idx >= self.test_size:
                 for token in self.encoding.encode(preprocess(data['text'])):
                     yield token
                     time.sleep(.0001)
@@ -54,7 +65,8 @@ class Library:
                 return
             
     def get_train_dataloader(self, batch_size):
-        return torch.utils.data.DataLoader(BookCorpusDataset(self._create_train_generator()), batch_size, shuffle=False)
+        dataset = BookCorpusDataset(self._create_train_generator())
+        return torch.utils.data.DataLoader(dataset, batch_size, shuffle=False)
     
     def get_test_dataloader(self, batch_size):
         return torch.utils.data.DataLoader(BookCorpusDataset(self._create_test_generator()), batch_size, shuffle=False)
@@ -68,8 +80,3 @@ class Library:
             seq_probs = torch.sum(y_pred*y_map, dim=1)
             log_prob += torch.sum(seq_probs)/seq_length
         return float(torch.exp(-log_prob/idx).item())
-
-if __name__ == '__main__':
-    lib = Library()
-    dataloader = lib.get_train_dataloader(64)
-    test_dataloader = lib.get_test_dataloader(64)
