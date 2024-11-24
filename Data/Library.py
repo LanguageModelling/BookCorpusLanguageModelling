@@ -1,8 +1,8 @@
 from typing import Any
 import datasets
-from .Preprocessing import preprocess
-from .IterableDataset import BookCorpusDataset
-from .BytePair import BytePairEncoder
+from Preprocessing import preprocess
+from IterableDataset import BookCorpusDataset
+from BytePair import BytePairEncoder
 import torch
 import torch.nn.functional as F
 from tiktoken import get_encoding

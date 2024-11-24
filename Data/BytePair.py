@@ -1,4 +1,4 @@
-from .utils import Indexer
+from utils import Indexer
 from collections import Counter
 import os.path
 import pickle as pkl
