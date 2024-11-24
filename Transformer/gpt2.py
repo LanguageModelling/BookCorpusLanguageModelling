@@ -15,6 +15,7 @@ n_embd = 27
 n_head = 1
 n_layer = 1
 dropout = 0.2
+grad_clip = 1.0 # added gradient clipping
 # ------------
 
 torch.manual_seed(1337)
@@ -24,7 +25,6 @@ with open('input.txt', 'r', encoding='utf-8') as f:
     text = f.read()
     p = len(text)
     text = text[:p//30]
-
 
 # here are all the unique characters that occur in this text
 chars = sorted(list(set(text)))
@@ -86,8 +86,7 @@ class Head(nn.Module):
         # compute attention scores ("affinities")
         wei = q @ k.transpose(-2,-1) * k.shape[-1]**-0.5 # (B, T, hs) @ (B, hs, T) -> (B, T, T)
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)
-        loss = nn.LogSoftmax(dim=-1)
-        wei = loss(wei) # (B, T, T)
+        wei = F.softmax(wei, dim=-1) # (B, T, T)
         wei = self.dropout(wei)
         # perform the weighted aggregation of the values
         v = self.value(x) # (B,T,hs)
@@ -221,8 +220,22 @@ for iter in range(max_iters):
 
     # evaluate the loss
     logits, loss = model(xb, yb)
+    
+    # print out loss to debug
+    print(f"iter {iter}: loss {loss.item()}")
+
+    # backpropagation and optimization
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
+    
+    # check for NaNs in gradients
+    for name, param in model.named_parameters():
+        if param.grad is not None and torch.isnan(param.grad).any():
+            print(f"NaN detected in gradients of {name}")
+    
+    # gradient clipping
+    torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+    
     optimizer.step()
 
 # generate from the model
