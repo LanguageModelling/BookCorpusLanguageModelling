@@ -123,5 +123,9 @@ sample_input = x_batch[0]  # First batch sample
 generated_tokens = model(sample_input.unsqueeze(0).long()).argmax(dim=-1)
 print("Generated tokens:", generated_tokens)
 
+########
+#Epoch 16/16 - Loss: 0.0700, Perplexity: 10.5483
+
+
 
 
