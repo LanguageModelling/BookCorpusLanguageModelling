@@ -1,4 +1,4 @@
-from utils import Indexer
+from .utils import Indexer
 from collections import Counter
 import os.path
 import pickle as pkl
@@ -32,6 +32,12 @@ class BytePairEncoder():
 
     def encode(self, sentence):
         return torch.LongTensor(self._encode(sentence))
+    
+    def decode(self, sentence):
+        output = ""
+        for x in sentence:
+            output += self.indexer.get_object(x.item())
+        return output
 
     def bigramify(self, split_sentence):
         '''
