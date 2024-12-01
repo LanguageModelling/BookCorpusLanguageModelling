@@ -10,32 +10,40 @@ from tiktoken import get_encoding
 import time
 import os
 
-
+print("in library")
 class Library:
     def __init__(self, encoding = 1000, train_size = 2**20, test_size = 2**16, streaming=True):
         self.streaming=streaming
         self.train_size = train_size
         self.test_size = test_size
         if streaming:
-            self.dataset = datasets.load_dataset('bookcorpus', streaming=streaming, trust_remote_code=True, split=f'train[:{self.test_size+self.train_size}]')
+            self.dataset = datasets.load_dataset('bookcorpus', streaming=streaming, trust_remote_code=True, split=f'train')
         else:
+            print("loading data")
             path = f'Data/bookcorpus.pt'
             if os.path.isfile(path):
+                print("found data")
                 self.dataset = torch.load(path, weights_only=False)
+                print("loaded data")
             else:
                 self.dataset = datasets.load_dataset('bookcorpus', streaming=streaming, trust_remote_code=True)['train']
                 torch.save(self.dataset, path)
 
         match encoding:
+           
             case '200k':
                 self.encoding = get_encoding('o200k_base')
+                print("encoding 200k")
             case '100k':
                 self.encoding = get_encoding('cl100k_base')
+                print("encoding 100k")
             case '50k':
+                print("encoding 50k")
                 self.encoding = get_encoding('r50k_base')
             case _ :
                 # Byte Pair
                 self.encoding = BytePairEncoder()
+                print("byte pair")
                 encoding_data = ''
                 for idx, data in enumerate(self.dataset):
                     if idx < self.train_size:
