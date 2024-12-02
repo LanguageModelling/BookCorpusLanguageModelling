@@ -78,7 +78,7 @@ class Library:
             new_indices[:, :, n] = batch_indices[:,nx:nx+seq_length-n, nx]
         return new_indices
     
-    def calc_perplexity(self, model, seq_length = 512, batch_size = 128):
+    def calc_perplexity(self, model, seq_length = 512, batch_size = 128, ngram=False):
         test_dataloader = self.get_test_dataloader(seq_length)
         log_prob = 0.0
         x_batch = torch.zeros([batch_size, seq_length-1])
@@ -88,6 +88,8 @@ class Library:
             y_batch[idx] = data[1:]
             if idx == batch_size-1:
                 # Run model
+                if ngram:
+                    x_batch = self.ngramify(x_batch)
                 y_pred = model(x_batch.long()).detach()
                 y_map = F.one_hot(y_batch.long(), num_classes=model.vocab_size).mT
                 log_probs = torch.sum(y_pred*y_map)/(seq_length)
