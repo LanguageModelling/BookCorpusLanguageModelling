@@ -17,14 +17,8 @@ class Library:
         self.train_size = train_size
         self.test_size = test_size
         if streaming:
-            self.dataset = datasets.load_dataset('bookcorpus', streaming=streaming, trust_remote_code=True, split=f'train')
-        else:
-            print("loading data")
-            path = f'Data/bookcorpus.pt'
-            if os.path.isfile(path):
-                print("found data")
-                self.dataset = torch.load(path, weights_only=False)
-                print("loaded data")
+
+
             else:
                 self.dataset = datasets.load_dataset('bookcorpus', streaming=streaming, trust_remote_code=True)['train']
                 torch.save(self.dataset, path)
@@ -86,7 +80,9 @@ class Library:
             new_indices[:, :, n] = batch_indices[:,nx:nx+seq_length-n, nx]
         return new_indices
     
-    def calc_perplexity(self, model, seq_length = 512, batch_size = 128):
+
+    def calc_perplexity(self, model, seq_length = 512, batch_size = 128, ngram=False):
+
         test_dataloader = self.get_test_dataloader(seq_length)
         log_prob = 0.0
         x_batch = torch.zeros([batch_size, seq_length-1])
@@ -96,6 +92,8 @@ class Library:
             y_batch[idx] = data[1:]
             if idx == batch_size-1:
                 # Run model
+
+
                 y_pred = model(x_batch.long()).detach()
                 y_map = F.one_hot(y_batch.long(), num_classes=model.vocab_size).mT
                 log_probs = torch.sum(y_pred*y_map)/(seq_length)
