@@ -6,10 +6,10 @@ import numpy as np
 
 # Hyperparameters
 batch_size = 64  # how many independent sequences will we process in parallel?
-block_size = 256  # what is the maximum context length for predictions?
-max_iters = 200
-eval_interval = 5
-learning_rate = 3e-4
+block_size = 512  # what is the maximum context length for predictions?
+max_iters = 500
+eval_interval = 500
+learning_rate = 3e-3
 device = 'mps' if torch.backends.mps.is_available() else 'cpu'
 print(device)
 eval_iters = 200
@@ -17,13 +17,16 @@ n_embd = 27
 n_head = 1
 n_layer = 1
 dropout = 0.2
-grad_clip = 1.0  # added gradient clipping
+grad_clip = 10000  # added gradient clipping
+seq_length = 512 
 
 # Dataset and Library setup
 encoding = 72
-train_size = 2**20
+train_size = 2**16
+test_size = 2**12
 library = Library(encoding=encoding, train_size=train_size, streaming=False)
 print("created object")
+
 # Initialize Model
 class Head(nn.Module):
     # One head of self-attention
@@ -36,10 +39,12 @@ class Head(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
+        
         B, T, C = x.shape
         k = self.key(x)  # (B,T,hs)
         q = self.query(x)  # (B,T,hs)
         wei = q @ k.transpose(-2, -1) * k.shape[-1] ** -0.5
+       
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf'))  # (B,T,T)
         wei = F.softmax(wei, dim=-1)  # (B,T,T)
         wei = self.dropout(wei)
@@ -57,6 +62,7 @@ class MultiHeadAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
+        
         out = torch.cat([h(x) for h in self.heads], dim=-1)
         out = self.dropout(self.proj(out))
         return out
@@ -94,43 +100,63 @@ class Block(nn.Module):
 
 
 class GPTLanguageModel(nn.Module):
-    def __init__(self):
+    def __init__(self, device):
         super().__init__()
+        self.vocab_size = library.encoding.max_token_value
+        self.device = device
         self.token_embedding_table = nn.Embedding(library.encoding.max_token_value, n_embd)
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
-        self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head) for _ in range(n_layer)])
-        self.ln_f = nn.LayerNorm(n_embd)
-        self.lm_head = nn.Linear(n_embd, library.encoding.max_token_value)
+        self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head) for _ in range(n_layer)]).to(self.device)
+        self.ln_f = nn.LayerNorm(n_embd).to(self.device)
+        self.lm_head = nn.Linear(n_embd, library.encoding.max_token_value).to(self.device)
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02).to(self.device)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(self, idx, targets=None):
+        if idx.dim() == 1:
+            idx = idx.unsqueeze(0)
         B, T = idx.shape
+        
+        # print(self.token_embedding_table.device)
         tok_emb = self.token_embedding_table(idx)
-        pos_emb = self.position_embedding_table(torch.arange(T, device=device))
+        
+        
+        pos_emb = self.position_embedding_table(torch.arange(T))
+        
+        # print("token embedding ", pos_emb.shape)
         x = tok_emb + pos_emb
+        x = x.to(self.device)
         x = self.blocks(x)
         x = self.ln_f(x)
+        
         logits = self.lm_head(x)
+        B, T, C = logits.shape
+        # logits = logits.view(B,T, C)
+        log_probs = F.log_softmax(logits, dim=-1)
+        log_probs = log_probs.permute(0,2,1)
+        
+        
+
 
         if targets is None:
             loss = None
+            return log_probs.to(torch.device('cpu'))
+        
         else:
-            B, T, C = logits.shape
-            logits = logits.view(B*T, C)
+            targets = targets.to(self.device)
+            
             targets = targets.view(B*T)
-            log_probs = F.log_softmax(logits, dim=-1)
+            
             loss = F.nll_loss(log_probs, targets)
 
-        return logits, loss
-
+        return log_probs.to(torch.device('cpu')), loss
     def generate(self, idx, max_new_tokens):
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -block_size:]
@@ -142,60 +168,61 @@ class GPTLanguageModel(nn.Module):
         return idx
 
 
-model = GPTLanguageModel().to(device)
-
+model = GPTLanguageModel(device=device)
+print(sum(p.numel() for p in model.parameters())/1e6, 'M parameters')
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-
-
-@torch.no_grad()
-def estimate_loss(model, library):
-    model.eval()
-    out = {}
-    for split in ['train', 'val']:
-        losses = torch.zeros(eval_iters)
-        dataloader = library.get_train_dataloader(batch_size) if split == 'train' else library.get_val_dataloader(batch_size)
-        for k, data in enumerate(dataloader):
-            if k >= eval_iters:
-                break
-            xb, yb = data[:-1], data[1:]
-            xb, yb = xb.to(device), yb.to(device)
-            logits, loss = model(xb, yb)
-            losses[k] = loss.item()
-        out[split] = losses.mean().item()
-    model.train()
-    return out
-
+loss_fn = nn.NLLLoss()
 
 # Training Loop
-for iter in range(max_iters):
-    if iter % eval_interval == 0 or iter == max_iters - 1:
-        losses = estimate_loss(model, library)
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+for epoch in range(max_iters):
+    # if iter % eval_interval == 0 or iter == max_iters - 1:
+    #     losses = estimate_loss(model, library)
+    #     print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
     # Load batch data using Library's DataLoader
-    dataloader = library.get_train_dataloader(batch_size)
-    print(dataloader)
-    print("-----------------------")
+    
+    dataloader = library.get_train_dataloader(seq_length+1)
+    
+    
+    
+    
+    xbatch = torch.zeros((batch_size,seq_length))
+    ybatch = torch.zeros((batch_size,seq_length))
+
     for idx, data in enumerate(dataloader):
+        mod_idx = idx%batch_size
+        # print("jere")
+
+        
+
         xb, yb = data[:-1], data[1:]
-
-        logits, loss = model(xb.to(device), yb.to(device))
+        if(data.shape[0]!=seq_length+1):
+            break
+        xbatch[mod_idx] = xb
+        ybatch[mod_idx] = yb
         
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
 
-        # Gradient clipping
-        torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+
+        if(mod_idx==batch_size-1):
+            optimizer.zero_grad(set_to_none=True)
+
+            logits = model(xbatch.long())
+            loss = loss_fn(logits, ybatch.long())
+            loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         
-        optimizer.step()
-    print("one interation")
+            optimizer.step()
+
+   
+        
 
     # Perplexity Evaluation
-    if iter % eval_interval == 0:
-        perplexity = library.calc_perplexity(model)
-        print(f"Perplexity at step {iter}: {perplexity:.4f}")
+    
+    perplexity = library.calc_perplexity(model)
+    print(f"Perplexity at step {epoch}: {perplexity:.4f}")
 
 # Generate output from the model
-context = torch.zeros((1, 1), dtype=torch.long, device=device)
-generated = model.generate(context, max_new_tokens=500)
-print(library.encoding.decode(generated[0].tolist()))
+context = torch.zeros((1, 1), dtype=torch.long)
+# generated = model.generate(context, max_new_tokens=500)
+# print(library.encoding.decode(generated[0].tolist()))
