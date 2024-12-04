@@ -67,6 +67,7 @@ class BytePairEncoder():
                 new_word_i, new_word_i_plus_one = bigram_counts.most_common(1)[0][0]
                 new_word = self.indexer.get_object(new_word_i) + self.indexer.get_object(new_word_i_plus_one)
                 self.indexer.add_and_get_index(new_word)
+                print(f'{len(self.indexer)}:{new_word}')
             # Save
             dicts = [self.indexer.objs_to_ints, self.indexer.ints_to_objs]
             pkl.dump(dicts, open(path, "wb" ) )
