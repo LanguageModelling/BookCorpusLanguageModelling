@@ -64,21 +64,21 @@ class Library:
                 return
             
     def get_train_dataloader(self, batch_size):
-        dataset = BookCorpusDataset(self._create_train_generator())
+        dataset = BookCorpusDataset(iter(list(self._create_train_generator())))
         dataloader = torch.utils.data.DataLoader(dataset, batch_size, shuffle=False)
         return dataloader
     
     def get_test_dataloader(self, batch_size):
         return torch.utils.data.DataLoader(BookCorpusDataset(self._create_test_generator()), batch_size, shuffle=False)
     
-    def ngramify(batch_indices, n=2):
+    def ngramify(self, batch_indices, n=2):
         batch_size, seq_length = batch_indices.shape
         new_indices = torch.zeros([batch_size, seq_length-n, n])
         for nx in range(n):
-            new_indices[:, :, n] = batch_indices[:,nx:nx+seq_length-n, nx]
+            new_indices[:, :, nx] = batch_indices[:,nx:nx+seq_length-n]
         return new_indices
     
-    def calc_perplexity(self, model, seq_length = 512, batch_size = 128, ngram=False):
+    def calc_perplexity(self, model, seq_length = 512, batch_size = 128, n_gram=None):
         test_dataloader = self.get_test_dataloader(seq_length)
         log_prob = 0.0
         x_batch = torch.zeros([batch_size, seq_length-1])
@@ -88,8 +88,9 @@ class Library:
             y_batch[idx] = data[1:]
             if idx == batch_size-1:
                 # Run model
-                if ngram:
-                    x_batch = self.ngramify(x_batch)
+                if n_gram != None:
+                    x_batch = self.ngramify(x_batch, n_gram)
+                    y_batch = y_batch[:, n_gram:]
                 y_pred = model(x_batch.long()).detach()
                 y_map = F.one_hot(y_batch.long(), num_classes=model.vocab_size).mT
                 log_probs = torch.sum(y_pred*y_map)/(seq_length)
