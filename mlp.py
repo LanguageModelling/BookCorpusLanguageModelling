@@ -80,7 +80,7 @@ for epoch in range(epochs):
     dataloader = library.get_train_dataloader(seq_length + 1)
     print(f"Epoch {epoch + 1}: Checking dataloader...")
     for batch in dataloader:
-        print(batch)  # Ensure data is being yielded
+        #print(batch)  # Ensure data is being yielded
         break
     for idx, data in enumerate(dataloader):
         mod_idx = idx % batch_size
@@ -123,8 +123,13 @@ sample_input = x_batch[0]  # First batch sample
 generated_tokens = model(sample_input.unsqueeze(0).long()).argmax(dim=-1)
 print("Generated tokens:", generated_tokens)
 
+num_params = library.get_n_params(model)
+print(f"Number of parameters in the model: {num_params}")
+
 ########
 #Epoch 16/16 - Loss: 0.0700, Perplexity: 10.5483
+
+#####Number of parameters in the model: 170572
 
 
 
