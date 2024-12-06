@@ -3,8 +3,10 @@ import numpy as np
 import datasets
 from .Preprocessing import preprocess
 from .IterableDataset import BookCorpusDataset
+from torch.utils.data import Dataset
 from .BytePair import BytePairEncoder
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from tiktoken import get_encoding
 import time
@@ -12,20 +14,16 @@ import os
 
 
 class Library:
-    def __init__(self, encoding = 1000, train_size = 2**20, test_size = 2**16, streaming=True):
-        self.streaming=streaming
+    def __init__(self, encoding = 1000, train_size = 2**20, test_size = 2**16, download_new = False):
         self.train_size = train_size
         self.test_size = test_size
-        if streaming:
-            self.dataset = datasets.load_dataset('bookcorpus', streaming=streaming, trust_remote_code=True, split=f'train[:{self.test_size+self.train_size}]')
+        path = f'Data/bookcorpus.pt'
+        if os.path.isfile(path) and not download_new:
+            self.dataset = torch.load(path, weights_only=False)
         else:
-            path = f'Data/bookcorpus.pt'
-            if os.path.isfile(path):
-                self.dataset = torch.load(path, weights_only=False)
-            else:
-                self.dataset = datasets.load_dataset('bookcorpus', streaming=streaming, trust_remote_code=True)[f'train[:{self.texts_size+self.train_size}']
-                torch.save(self.dataset, path)
-
+            self.dataset = datasets.load_dataset('bookcorpus', streaming=False, trust_remote_code=True, split=f'train[:100000]')
+            self.dataset.set_format('torch')
+            torch.save(self.dataset, path)
         match encoding:
             case '200k':
                 self.encoding = get_encoding('o200k_base')
@@ -43,8 +41,9 @@ class Library:
                     else:
                         break
                 self.encoding.train(encoding_data, vocab_size=encoding)
-        self.train_generator = self._create_train_generator()
-        self.test_generator = self._create_test_generator()
+        self.prepped_dataset = self.dataset.map(self.tokenize, remove_columns=['text'], batched=True)['tokens']
+        #self.train_generator = self._create_train_generator()
+        #self.test_generator = self._create_test_generator()
                 
     
     def _create_train_generator(self):
@@ -62,14 +61,28 @@ class Library:
                     yield token
             else:
                 return
-            
+    def tokenize(self, batch):
+        # Tokenize each item and explode into individual tokens
+        exploded_tokens = [
+            {"tokens": token}
+            for item in batch["text"]
+            for token in self.encoding.encode(preprocess(item)).tolist()
+        ]
+        # Flatten into a single dictionary with one token per row
+        return {key: [d[key] for d in exploded_tokens] for key in exploded_tokens[0]}
+
+    
     def get_train_dataloader(self, batch_size):
-        dataset = BookCorpusDataset(iter(list(self._create_train_generator())))
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size, shuffle=False)
+
+        #dataset = BookCorpusDataset(iter(list(self._create_train_generator())))
+        #dataloader = torch.utils.data.DataLoader(dataset, batch_size, shuffle=False)
+        dataloader = torch.utils.data.DataLoader(BookCorpusDataset(self.prepped_dataset[:self.train_size]), batch_size, shuffle=False)
         return dataloader
     
     def get_test_dataloader(self, batch_size):
-        return torch.utils.data.DataLoader(BookCorpusDataset(self._create_test_generator()), batch_size, shuffle=False)
+        dataloader = torch.utils.data.DataLoader(BookCorpusDataset(self.prepped_dataset[self.train_size:self.train_size+self.test_size]), batch_size, shuffle=False)
+        return dataloader
+        #return torch.utils.data.DataLoader(BookCorpusDataset(self._create_test_generator()), batch_size, shuffle=False)
     
     def ngramify(self, batch_indices, n=2):
         batch_size, seq_length = batch_indices.shape
@@ -78,31 +91,39 @@ class Library:
             new_indices[:, :, nx] = batch_indices[:,nx:nx+seq_length-n]
         return new_indices
     
-    def calc_perplexity(self, model, seq_length = 512, batch_size = 128, n_gram=None):
+    def calc_perplexity(self, model, seq_length = 256, batch_size = 64, n_gram=None):
         test_dataloader = self.get_test_dataloader(seq_length)
-        log_prob = 0.0
+        loss_fn = nn.NLLLoss(reduction='sum')
+        total_tokens = 0
+        total_loss = 0.0
         x_batch = torch.zeros([batch_size, seq_length-1])
         y_batch = torch.zeros([batch_size, seq_length-1])
         for idx, data in enumerate(test_dataloader):
-            x_batch[idx] = data[:-1]
-            y_batch[idx] = data[1:]
+            mod_idx = idx % batch_size
+            if data.shape[0] != seq_length:
+                break # End of usable dataloader
+            x_batch[mod_idx] = data[:-1]
+            y_batch[mod_idx] = data[1:]
             if idx == batch_size-1:
+                total_tokens += (seq_length-1)*batch_size
                 # Run model
                 if n_gram != None:
-                    x_batch = self.ngramify(x_batch, n_gram)
-                    y_batch = y_batch[:, n_gram:]
-                y_pred = model(x_batch.long()).detach()
-                y_map = F.one_hot(y_batch.long(), num_classes=model.vocab_size).mT
-                log_probs = torch.sum(y_pred*y_map)/(seq_length)
-                return np.exp(-log_probs/idx)
+                    x_batch_gram = self.ngramify(x_batch, n_gram)
+                    y_batch_gram = y_batch[:, n_gram:]
+                    y_pred = model(x_batch_gram.long()).detach()
+                    total_loss += loss_fn(y_pred, y_batch_gram.long()).item()
+                else:
+                    y_pred = model(x_batch.long()).detach()
+                    total_loss += loss_fn(y_pred, y_batch.long()).item()
+        return np.exp(total_loss/total_tokens)
 
     def shannon(self, model, length=100):
-        current_sentence = torch.LongTensor(self.encoder.encode('[')).unsqueeze(0)
+        current_sentence = torch.LongTensor(self.encoding.encode('[')).unsqueeze(0)
         for i in range(length):
             output = torch.exp(model(current_sentence))[0,:,-1]
             new_char=torch.distributions.categorical.Categorical(probs=output).sample()
             current_sentence = torch.cat((current_sentence, new_char.unsqueeze(0).unsqueeze(0)))
-        return self.encoder.decode(current_sentence)
+        return self.encoding.decode(current_sentence)
     
     # Code from https://discuss.pytorch.org/t/how-do-i-check-the-number-of-parameters-of-a-model/4325/5
     def get_n_params(self, model):
