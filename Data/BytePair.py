@@ -52,11 +52,16 @@ class BytePairEncoder():
         return bigrams
 
 
-    def train(self, corpus, vocab_size=1000):
+    def train(self, dataset, vocab_size=1000):
         path = f'Data/BPEs/{vocab_size}.pkl'
         if os.path.isfile(path):
             self.indexer.objs_to_ints, self.indexer.ints_to_objs = pkl.load(open(path, "rb"))
         else:
+            # Flatten data
+            encoding_data = ''
+            for idx, data in enumerate(dataset):
+                encoding_data += preprocess(data['text'])
+            corpus = encoding_data
             # Create vocab]
             self.add_characters()
             while len(self.indexer) < vocab_size:

@@ -4,8 +4,8 @@ import pandas as pd
 from torch.utils.data import IterableDataset
 
 class BookCorpusDataset(IterableDataset):
-    def __init__(self, generator):
-        self.generator = generator
+    def __init__(self, prepped_dataset):
+        self.generator = iter(prepped_dataset)
     
     def __iter__(self):
         return self.generator
