@@ -18,6 +18,7 @@ their strengths and limitations.
   - [S4](#s4)
   - [Transformer](#transformer)
 - [Training and Evaluation](#training-and-evaluation)
+- [How To Run The Models](#how-to-use-the-models?)
 - [Usage](#usage)
 
 ---
