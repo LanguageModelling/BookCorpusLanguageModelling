@@ -1,11 +1,11 @@
 # Bookcorpus LanguageModeling
 For this project, we implemented and evaluated
-three language models to understand their effective-
-ness in sequence modeling tasks. Language model-
+three language models to understand their effective
+ness in sequence modeling tasks. Language model
 ing is a cornerstone of natural language processing,
-and selecting the right model can significantly im-
+and selecting the right model can significantly im
 pact efficiency and performance. By comparing
-these models with different vocab sizes and struc-
+these models with different vocab sizes and struc
 tural complexities, we aim to provide insights into
 their strengths and limitations.
 
@@ -28,6 +28,8 @@ The project uses a custom `Library` class to generate and manage datasets:
 - **Encoding**: Tokens are encoded using a defined `encoding` size.
 - **Train/Test Split**: The dataset is divided into training and test sets.
 - **DataLoader**: Provides sequential data in batches for training and evaluation.
+- **Shannon**: Provides a Method to generate n tokens for a given model.
+- While creating the library class, we specify the vocab size - based on the same it will choose a character level implementation or a byte pair implementation.
 
 
 ---
@@ -88,7 +90,8 @@ For evaluation, we used the same starting conditions and the iteration count tha
 
 ---
 
-## Usage
+## How to use the models?
+We have empirically tested different hyper parameters and set the best performing ones for all models in their respective notebook files. You can run all the models by just opening the notebook in the project root directory and running the cells. The hyper parameters, device management (GPU or CPU), and training, are all set in these notebooks. We have trained these models on A100 or K80 GPUs. Running the current parameters without access to proper GPU is not recommented. Lowering some dimensions, number of layers, should be enough to test the flow, learning, and generation of these models. The models available for use are `mlp.ipynb`, `s4.ipynb`, `transformer.ipynb`.
 
 ### Requirements
 - Python 3.8+
