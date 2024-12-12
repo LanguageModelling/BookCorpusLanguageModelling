@@ -1,24 +1,5 @@
 # Bookcorpus LanguageModeling
-For our project, we are contrasting a set of neural language models with
-our metric being perplexity.
-
-## Table of Contents
-
-- [Project Overview](#project-overview)
-- [Implemented Models](#implemented-models)
-  - [MLP](#mlp)
-  - [RNN](#rnn)
-  - [S4](#s4)
-  - [Transformer](#transformer)
-- [Dataset Preparation](#dataset-preparation)
-- [Training and Evaluation](#training-and-evaluation)
-- [Usage](#usage)
-
----
-
-## Project Overview
-
-For our project, we implemented and evaluated
+For this project, we implemented and evaluated
 three language models to understand their effective-
 ness in sequence modeling tasks. Language model-
 ing is a cornerstone of natural language processing,
@@ -26,7 +7,29 @@ and selecting the right model can significantly im-
 pact efficiency and performance. By comparing
 these models with different vocab sizes and struc-
 tural complexities, we aim to provide insights into
-their strengths and limitations. 
+their strengths and limitations.
+
+## Table of Contents
+
+- [Dataset Preparation](#dataset-preparation)
+- [Implemented Models](#implemented-models)
+  - [MLP](#mlp)
+  - [RNN](#rnn)
+  - [S4](#s4)
+  - [Transformer](#transformer)
+- [Training and Evaluation](#training-and-evaluation)
+- [Usage](#usage)
+
+---
+## Dataset Preparation
+Dataset link: https://huggingface.co/datasets/bookcorpus/bookcorpus
+
+The project uses a custom `Library` class to generate and manage datasets:
+- **Encoding**: Tokens are encoded using a defined `encoding` size.
+- **Train/Test Split**: The dataset is divided into training and test sets.
+- **DataLoader**: Provides sequential data in batches for training and evaluation.
+
+
 ---
 
 ## Implemented Models
@@ -67,15 +70,6 @@ their strengths and limitations.
   - Feedforward layers with residual connections and LayerNorm.
   - LogSoftmax for output probabilities.
 
----
-
-## Dataset Preparation
-Dataset link: https://huggingface.co/datasets/bookcorpus/bookcorpus
-
-The project uses a custom `Library` class to generate and manage datasets:
-- **Encoding**: Tokens are encoded using a defined `encoding` size.
-- **Train/Test Split**: The dataset is divided into training and test sets.
-- **DataLoader**: Provides sequential data in batches for training and evaluation.
 
 ---
 
