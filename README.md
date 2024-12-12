@@ -18,7 +18,7 @@ their strengths and limitations.
   - [S4](#s4)
   - [Transformer](#transformer)
 - [Training and Evaluation](#training-and-evaluation)
-- [How To Run The Models](#how-to-use-the-models?)
+- [How to use the models](#how-to-use-the-models)
 - [Usage](#usage)
 
 ---
@@ -91,7 +91,7 @@ For evaluation, we used the same starting conditions and the iteration count tha
 
 ---
 
-## How to use the models?
+## How to use the models
 We have empirically tested different hyper parameters and set the best performing ones for all models in their respective notebook files. You can run all the models by just opening the notebook in the project root directory and running the cells. The hyper parameters, device management (GPU or CPU), and training, are all set in these notebooks. We have trained these models on A100 or K80 GPUs. Running the current parameters without access to proper GPU is not recommented. Lowering some dimensions, number of layers, should be enough to test the flow, learning, and generation of these models. The models available for use are `mlp.ipynb`, `s4.ipynb`, `transformer.ipynb`.
 
 ### Requirements
