@@ -83,8 +83,7 @@ of sizes.
 For all models, Adam optimizer was used with a
 negative log-likelihood loss function. Models were
 trained up to 64 epochs. The set of nine models
-were trained on the Discovery cluster at Northeast-
-ern, using 16GB of RAM, and using either a T4,
+were trained on the Discovery cluster at Northeastern, using 16GB of RAM, and using either a T4,
 V100, or A100 GPU. 
 
 For evaluation, we used the same starting conditions and the iteration count that minimized the perplexity.
@@ -92,7 +91,8 @@ For evaluation, we used the same starting conditions and the iteration count tha
 ---
 
 ## How to use the models
-We have empirically tested different hyper parameters and set the best performing ones for all models in their respective notebook files. You can run all the models by just opening the notebook in the project root directory and running the cells. The hyper parameters, device management (GPU or CPU), and training, are all set in these notebooks. We have trained these models on A100 or K80 GPUs. Running the current parameters without access to proper GPU is not recommented. Lowering some dimensions, number of layers, should be enough to test the flow, learning, and generation of these models. The models available for use are `mlp.ipynb`, `s4.ipynb`, `transformer.ipynb`.
+We have empirically tested different hyper parameters and set the best performing ones for all models in their respective notebook files. You can run all the models by just opening the notebook in the project root directory and running the cells. The hyper parameters, device management (GPU or CPU), and training, are all set in these notebooks. We have trained these models on T4,
+V100, or A100 GPUs. Running the current parameters without access to proper GPU is not recommented. Lowering some dimensions, number of layers, should be enough to test the flow, learning, and generation of these models. The models available for use are `mlp.ipynb`, `s4.ipynb`, `transformer.ipynb`.
 
 ### Requirements
 - Python 3.8+
